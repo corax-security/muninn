@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Local;
 use clap::Parser;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -61,6 +62,9 @@ struct Cli {
 
     #[arg(short = 'q', long = "quiet")]
     quiet: bool,
+
+    #[arg(long = "no-report")]
+    no_report: bool,
 }
 
 fn level_rank(level: &str) -> u8 {
@@ -90,12 +94,20 @@ fn main() -> Result<()> {
         .init();
     let cli = Cli::parse();
     let start = Instant::now();
+    let run_timestamp = Local::now();
 
     if !cli.quiet {
         println!(
-            "\n  {} {}\n",
-            "muninn".cyan().bold(),
-            "— memory of Corax".dimmed()
+            "\n  {} {}",
+            "Muninn".cyan().bold(),
+            "by corax team".dimmed()
+        );
+        println!(
+            "  {}\n",
+            run_timestamp
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+                .dimmed()
         );
     }
 
@@ -117,7 +129,7 @@ fn main() -> Result<()> {
         let pb = ProgressBar::new(files.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template("  {spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} files ({eta})")
+                .template("  {spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} files | {msg}")
                 .unwrap()
                 .progress_chars("█▉▊▋▌▍▎▏ "),
         );
@@ -130,8 +142,17 @@ fn main() -> Result<()> {
     let mut total_events = 0;
     let mut format_stats: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
+    let mut parse_errors: Vec<String> = Vec::new();
 
     for file in &files {
+        if let Some(ref pb) = pb {
+            let name = file
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            pb.set_message(name);
+        }
         match parsers::parse_file(file) {
             Ok(mut result) => {
                 if cli.hashes {
@@ -147,13 +168,18 @@ fn main() -> Result<()> {
                 total_events += n;
             }
             Err(e) => {
+                let msg = format!(
+                    "{}: {}",
+                    file.file_name().unwrap_or_default().to_string_lossy(),
+                    e
+                );
+                parse_errors.push(msg.clone());
                 if !cli.quiet {
-                    eprintln!(
-                        "  {} {:?}: {}",
-                        "✗".red(),
-                        file.file_name().unwrap_or_default(),
-                        e
-                    );
+                    if let Some(ref pb) = pb {
+                        pb.suspend(|| {
+                            eprintln!("  {} {}", "✗".red(), msg);
+                        });
+                    }
                 }
             }
         }
@@ -166,7 +192,19 @@ fn main() -> Result<()> {
         pb.finish_and_clear();
     }
 
-    engine.create_indexes()?;
+    if !cli.quiet && total_events > 10000 {
+        let idx_pb = ProgressBar::new_spinner();
+        idx_pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("  {spinner:.green} Creating indexes...")
+                .unwrap(),
+        );
+        idx_pb.enable_steady_tick(std::time::Duration::from_millis(80));
+        engine.create_indexes()?;
+        idx_pb.finish_and_clear();
+    } else {
+        engine.create_indexes()?;
+    }
 
     if !cli.quiet {
         let formats: Vec<String> = format_stats
@@ -226,8 +264,28 @@ fn main() -> Result<()> {
             println!("  {} Loaded {} SIGMA rule(s)", "✓".green(), rules.len());
         }
 
+        let sigma_pb = if !cli.quiet && rules.len() > 50 {
+            let pb = ProgressBar::new(rules.len() as u64);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template(
+                        "  {spinner:.green} [{bar:40.magenta/blue}] {pos}/{len} rules | {msg}",
+                    )
+                    .unwrap()
+                    .progress_chars("█▉▊▋▌▍▎▏ "),
+            );
+            Some(pb)
+        } else {
+            None
+        };
+
         let mut matched = 0;
         for rule in &rules {
+            if let Some(ref pb) = sigma_pb {
+                pb.set_message(rule.title.chars().take(50).collect::<String>());
+                pb.inc(1);
+            }
+
             if level_rank(&rule.level) < min_rank {
                 continue;
             }
@@ -243,6 +301,10 @@ fn main() -> Result<()> {
                 },
                 Err(e) => log::debug!("Rule '{}' compile error: {}", rule.title, e),
             }
+        }
+
+        if let Some(pb) = sigma_pb {
+            pb.finish_and_clear();
         }
 
         if !cli.quiet {
@@ -336,11 +398,44 @@ fn main() -> Result<()> {
                 total_matches.to_string().bold()
             );
         }
+    } else if !cli.stats && cli.distinct.is_none() && cli.dbfile.is_none() && !cli.quiet {
+        println!("  No matches found.\n");
+    }
 
-        if let Some(ref output) = cli.output {
-            let json_results: Vec<_> = results
-                .iter()
-                .map(|(label, level, r)| {
+    let has_any_output =
+        !results.is_empty() || cli.stats || cli.distinct.is_some() || cli.dbfile.is_some();
+
+    if has_any_output || !parse_errors.is_empty() {
+        let output_path = if let Some(ref output) = cli.output {
+            output.clone()
+        } else if !cli.no_report {
+            PathBuf::from(format!(
+                "muninn_report_{}.json",
+                run_timestamp.format("%Y-%m-%d_%H-%M-%S")
+            ))
+        } else {
+            PathBuf::new()
+        };
+
+        if !output_path.as_os_str().is_empty() {
+            let total_matches: usize = results.iter().map(|(_, _, r)| r.count).sum();
+            let elapsed = start.elapsed().as_secs_f64();
+
+            let report = serde_json::json!({
+                "tool": "muninn",
+                "version": env!("CARGO_PKG_VERSION"),
+                "timestamp": run_timestamp.to_rfc3339(),
+                "duration_sec": format!("{:.1}", elapsed),
+                "source": cli.events.to_string_lossy(),
+                "summary": {
+                    "files_scanned": files.len(),
+                    "total_events": total_events,
+                    "rules_matched": results.len(),
+                    "total_detections": total_matches,
+                    "formats": &format_stats,
+                    "errors": parse_errors.len(),
+                },
+                "detections": results.iter().map(|(label, level, r)| {
                     serde_json::json!({
                         "title": label,
                         "level": level,
@@ -349,15 +444,15 @@ fn main() -> Result<()> {
                         "query": r.query,
                         "events": r.rows,
                     })
-                })
-                .collect();
-            std::fs::write(output, serde_json::to_string_pretty(&json_results)?)?;
+                }).collect::<Vec<_>>(),
+                "errors": parse_errors,
+            });
+
+            std::fs::write(&output_path, serde_json::to_string_pretty(&report)?)?;
             if !cli.quiet {
-                println!("  {} Results → {:?}\n", "✓".green(), output);
+                println!("  {} Report → {:?}\n", "✓".green(), output_path);
             }
         }
-    } else if !cli.stats && cli.distinct.is_none() && cli.dbfile.is_none() && !cli.quiet {
-        println!("  No matches found.\n");
     }
 
     Ok(())
