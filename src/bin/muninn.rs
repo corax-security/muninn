@@ -67,6 +67,16 @@ struct Cli {
     no_report: bool,
 }
 
+struct Detection {
+    title: String,
+    level: String,
+    description: String,
+    id: String,
+    author: String,
+    tags: Vec<String>,
+    result: muninn::SearchResult,
+}
+
 fn level_rank(level: &str) -> u8 {
     match level.to_lowercase().as_str() {
         "critical" => 5,
@@ -253,7 +263,7 @@ fn main() -> Result<()> {
         println!();
     }
 
-    let mut results: Vec<(String, String, muninn::SearchResult)> = Vec::new();
+    let mut results: Vec<Detection> = Vec::new();
     let min_rank = level_rank(&cli.min_level);
 
     if let Some(ref rules_path) = cli.rules {
@@ -294,7 +304,15 @@ fn main() -> Result<()> {
                 Ok(sql) => match engine.query_sql(&sql) {
                     Ok(r) if r.count > 0 => {
                         matched += 1;
-                        results.push((rule.title.clone(), rule.level.clone(), r));
+                        results.push(Detection {
+                            title: rule.title.clone(),
+                            level: rule.level.clone(),
+                            description: rule.description.clone(),
+                            id: rule.id.clone(),
+                            author: rule.author.clone(),
+                            tags: rule.tags.clone(),
+                            result: r,
+                        });
                     }
                     Ok(_) => {}
                     Err(e) => log::debug!("Rule '{}' SQL error: {}", rule.title, e),
@@ -330,7 +348,10 @@ fn main() -> Result<()> {
             };
 
             match engine.query_sql(&sql) {
-                Ok(r) if r.count > 0 => results.push((label, "medium".into(), r)),
+                Ok(r) if r.count > 0 => results.push(Detection {
+                    title: label, level: "medium".into(), description: String::new(),
+                    id: String::new(), author: String::new(), tags: Vec::new(), result: r,
+                }),
                 Ok(_) => {}
                 Err(e) => {
                     if !cli.quiet {
@@ -343,33 +364,45 @@ fn main() -> Result<()> {
 
     if let Some(ref sql) = cli.sql {
         let r = engine.query_sql(sql)?;
-        results.push(("SQL query".into(), "medium".into(), r));
+        results.push(Detection {
+            title: "SQL query".into(), level: "medium".into(), description: String::new(),
+            id: String::new(), author: String::new(), tags: Vec::new(), result: r,
+        });
     }
 
     if let Some(ref kw) = cli.keyword {
         let r = engine.search_keyword(kw)?;
-        results.push((format!("keyword: {}", kw), "medium".into(), r));
+        results.push(Detection {
+            title: format!("keyword: {}", kw), level: "medium".into(), description: String::new(),
+            id: String::new(), author: String::new(), tags: Vec::new(), result: r,
+        });
     }
 
     if let Some(ref fs) = cli.field_search {
         if let Some((field, pattern)) = fs.split_once('=') {
             let r = engine.search_field(field, pattern)?;
-            results.push((format!("{}={}", field, pattern), "medium".into(), r));
+            results.push(Detection {
+                title: format!("{}={}", field, pattern), level: "medium".into(), description: String::new(),
+                id: String::new(), author: String::new(), tags: Vec::new(), result: r,
+            });
         }
     }
 
     if let Some(ref rs) = cli.regex_search {
         if let Some((field, pattern)) = rs.split_once('=') {
             let r = engine.search_regex(field, pattern)?;
-            results.push((format!("{} =~ /{}/", field, pattern), "medium".into(), r));
+            results.push(Detection {
+                title: format!("{} =~ /{}/", field, pattern), level: "medium".into(), description: String::new(),
+                id: String::new(), author: String::new(), tags: Vec::new(), result: r,
+            });
         }
     }
 
     if !results.is_empty() {
         results.sort_by(|a, b| {
-            level_rank(&b.1)
-                .cmp(&level_rank(&a.1))
-                .then(b.2.count.cmp(&a.2.count))
+            level_rank(&b.level)
+                .cmp(&level_rank(&a.level))
+                .then(b.result.count.cmp(&a.result.count))
         });
 
         if !cli.quiet {
@@ -377,17 +410,17 @@ fn main() -> Result<()> {
                 "{}",
                 "  ══════════════════════════════════════════════════════════════════════".cyan()
             );
-            for (label, level, r) in &results {
+            for d in &results {
                 println!(
                     "  {} {:<12} {} — {} matches ({}ms)",
                     "●".bold(),
-                    level_color(level),
-                    label,
-                    r.count.to_string().bold(),
-                    r.duration_ms
+                    level_color(&d.level),
+                    d.title,
+                    d.result.count.to_string().bold(),
+                    d.result.duration_ms
                 );
             }
-            let total_matches: usize = results.iter().map(|(_, _, r)| r.count).sum();
+            let total_matches: usize = results.iter().map(|d| d.result.count).sum();
             println!(
                 "{}",
                 "  ══════════════════════════════════════════════════════════════════════".cyan()
@@ -418,7 +451,7 @@ fn main() -> Result<()> {
         };
 
         if !output_path.as_os_str().is_empty() {
-            let total_matches: usize = results.iter().map(|(_, _, r)| r.count).sum();
+            let total_matches: usize = results.iter().map(|d| d.result.count).sum();
             let elapsed = start.elapsed().as_secs_f64();
 
             let report = serde_json::json!({
@@ -435,15 +468,28 @@ fn main() -> Result<()> {
                     "formats": &format_stats,
                     "errors": parse_errors.len(),
                 },
-                "detections": results.iter().map(|(label, level, r)| {
-                    serde_json::json!({
-                        "title": label,
-                        "level": level,
-                        "count": r.count,
-                        "duration_ms": r.duration_ms,
-                        "query": r.query,
-                        "events": r.rows,
-                    })
+                "detections": results.iter().map(|d| {
+                    let mut det = serde_json::json!({
+                        "title": d.title,
+                        "level": d.level,
+                        "count": d.result.count,
+                        "duration_ms": d.result.duration_ms,
+                        "query": d.result.query,
+                        "events": d.result.rows,
+                    });
+                    if !d.id.is_empty() {
+                        det["id"] = serde_json::json!(d.id);
+                    }
+                    if !d.description.is_empty() {
+                        det["description"] = serde_json::json!(d.description);
+                    }
+                    if !d.author.is_empty() {
+                        det["author"] = serde_json::json!(d.author);
+                    }
+                    if !d.tags.is_empty() {
+                        det["tags"] = serde_json::json!(d.tags);
+                    }
+                    det
                 }).collect::<Vec<_>>(),
                 "errors": parse_errors,
             });

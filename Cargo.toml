@@ -1,6 +1,6 @@
 [package]
 name = "muninn"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Muninn — memory of Corax. High-performance log parsing, SIGMA detection, and search engine. Parses 15+ log formats (EVTX, JSON, Syslog, CEF, LEEF, Zeek, W3C, Auditd, XML, etc.) with built-in SIGMA YAML compiler and SQLite-backed search. One binary, zero dependencies."
 license = "AGPL-3.0-only"
