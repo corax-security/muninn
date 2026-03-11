@@ -89,14 +89,20 @@ impl SearchEngine {
             return Ok(0);
         }
 
-        let mut col_set: HashSet<String> = self.columns.iter().cloned().collect();
+        // Deduplicate columns case-insensitively (SQLite column names are case-insensitive)
+        let mut seen_lower: HashSet<String> =
+            self.columns.iter().map(|c| c.to_lowercase()).collect();
+        let mut col_set: Vec<String> = self.columns.clone();
         for ev in events {
             for k in ev.fields.keys() {
-                col_set.insert(k.clone());
+                let lower = k.to_lowercase();
+                if seen_lower.insert(lower) {
+                    col_set.push(k.clone());
+                }
             }
         }
 
-        let new_columns: Vec<String> = col_set.into_iter().collect();
+        let new_columns = col_set;
 
         if self.columns.is_empty() {
             let col_defs: Vec<String> = new_columns
