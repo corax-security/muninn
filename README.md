@@ -188,17 +188,22 @@ muninn -e ./evidence/ -r sigma-rules/ --hashes
 muninn -e ./evidence/ -r sigma-rules/ --stats --timeline --killchain --threat-score --anomalies --ioc-extract --correlate --transforms
 
 # MITRE ATT&CK
-muninn -e ./evidence/ -r sigma-rules/ --killchain              # kill chain view
+muninn -e ./evidence/ -r sigma-rules/ --killchain              # console + auto-save .txt
+muninn -e ./evidence/ -r sigma-rules/ --killchain kc.html      # save as HTML report
 muninn -e ./evidence/ -r sigma-rules/ --navigator layer.json   # ATT&CK Navigator export
 
 # Attack timeline
-muninn -e ./evidence/ -r sigma-rules/ --timeline
+muninn -e ./evidence/ -r sigma-rules/ --timeline               # console + auto-save .txt
+muninn -e ./evidence/ -r sigma-rules/ --timeline tl.html       # save as HTML
 
 # Anomaly detection (no rules needed)
-muninn -e ./evidence/ --anomalies
+muninn -e ./evidence/ --anomalies                              # console + auto-save .txt
+muninn -e ./evidence/ --anomalies anomalies.json               # save as JSON
+muninn -e ./evidence/ --anomalies anomalies.html               # save as HTML
 
 # IOC extraction
-muninn -e ./evidence/ --ioc-extract
+muninn -e ./evidence/ --ioc-extract                            # console + auto-save .txt
+muninn -e ./evidence/ --ioc-extract iocs.html                  # save as HTML
 
 # IOC enrichment with threat intelligence
 muninn -e ./evidence/ --ioc-extract --vt-key YOUR_VT_KEY
@@ -207,10 +212,12 @@ muninn -e ./evidence/ --ioc-extract --opentip-key YOUR_OPENTIP_KEY
 muninn -e ./evidence/ --ioc-extract --vt-key VT_KEY --abuseipdb-key ABUSEIPDB_KEY  # multiple
 
 # Threat scoring per host/user
-muninn -e ./evidence/ -r sigma-rules/ --threat-score
+muninn -e ./evidence/ -r sigma-rules/ --threat-score           # console + auto-save .txt
+muninn -e ./evidence/ -r sigma-rules/ --threat-score scores.html  # HTML report
 
 # Attack chain correlation
-muninn -e ./evidence/ -r sigma-rules/ --correlate
+muninn -e ./evidence/ -r sigma-rules/ --correlate              # console + auto-save .txt
+muninn -e ./evidence/ -r sigma-rules/ --correlate chains.json  # save as JSON
 
 # Field transforms (base64 decode, LOLBin detect, DNS entropy, obfuscation)
 muninn -e ./evidence/ --transforms -r sigma-rules/
@@ -337,13 +344,13 @@ muninn --config muninn.yaml
 |---------|------|-------------|
 | **MITRE ATT&CK mapping** | *(auto)* | Maps detections to techniques/tactics from rule tags |
 | **ATT&CK Navigator** | `--navigator layer.json` | Export layer for ATT&CK Navigator |
-| **Kill chain view** | `--killchain` | ASCII kill chain visualization by tactic |
-| **Attack timeline** | `--timeline` | Chronological attack timeline |
-| **Anomaly detection** | `--anomalies` | Rare processes, off-hours logons, unusual parent-child |
-| **IOC extraction** | `--ioc-extract` | Extract IPs, domains, URLs, hashes, emails |
+| **Kill chain view** | `--killchain [FILE]` | ASCII kill chain visualization by tactic |
+| **Attack timeline** | `--timeline [FILE]` | Chronological attack timeline |
+| **Anomaly detection** | `--anomalies [FILE]` | Rare processes, off-hours logons, unusual parent-child |
+| **IOC extraction** | `--ioc-extract [FILE]` | Extract IPs, domains, URLs, hashes, emails |
 | **IOC enrichment** | `--vt-key` / `--abuseipdb-key` / `--opentip-key` | VirusTotal, AbuseIPDB, Kaspersky OpenTIP |
-| **Threat scoring** | `--threat-score` | Per-host/user risk scoring |
-| **Attack correlation** | `--correlate` | Group detections into attack chains |
+| **Threat scoring** | `--threat-score [FILE]` | Per-host/user risk scoring |
+| **Attack correlation** | `--correlate [FILE]` | Group detections into attack chains |
 | **Diff mode** | `--diff /path/to/second/` | Compare two evidence sets |
 | **Field transforms** | `--transforms` | Base64 decode, LOLBin detect, DNS entropy, obfuscation scoring |
 | **Field mapping** | `--field-map map.yaml` | Rename fields across all events |
@@ -790,13 +797,13 @@ SIGMA:
       --profile-rules            Show rule execution time ranking
       --hashes                   Compute event hashes
 
-ANALYSIS:
-      --timeline                 Show attack timeline
-      --killchain                Kill chain visualization
-      --anomalies                Detect statistical anomalies
-      --ioc-extract              Extract IOCs (IPs, domains, hashes, URLs)
-      --threat-score             Per-host/user threat scoring
-      --correlate                Correlate events into attack chains
+ANALYSIS (all support optional FILE path — .txt default, .html/.json by extension):
+      --timeline [FILE]          Show attack timeline and save to file
+      --killchain [FILE]         Kill chain visualization and save to file
+      --anomalies [FILE]         Detect statistical anomalies and save to file
+      --ioc-extract [FILE]       Extract IOCs and save to file
+      --threat-score [FILE]      Per-host/user threat scoring and save to file
+      --correlate [FILE]         Correlate events into attack chains and save to file
       --transforms               Field transforms (base64 decode, LOLBin, DNS entropy)
 
 IOC ENRICHMENT (requires --features ioc-enrich):
@@ -1040,13 +1047,13 @@ muninn --download-rules all --rules-dir ./my-rules/  # своя директор
 |---------|------|----------|
 | **Маппинг MITRE ATT&CK** | *(авто)* | Привязка детектов к техникам и тактикам из тегов правил |
 | **ATT&CK Navigator** | `--navigator layer.json` | Экспорт слоя для ATT&CK Navigator |
-| **Kill chain** | `--killchain` | ASCII-визуализация по тактикам |
-| **Таймлайн атаки** | `--timeline` | Хронологический таймлайн атаки |
-| **Детекция аномалий** | `--anomalies` | Редкие процессы, нетипичное время логона, необычные parent-child |
-| **Извлечение IOC** | `--ioc-extract` | IP-адреса, домены, URL, хэши, email |
+| **Kill chain** | `--killchain [FILE]` | ASCII-визуализация по тактикам, сохранение в файл |
+| **Таймлайн атаки** | `--timeline [FILE]` | Хронологический таймлайн атаки, сохранение в файл |
+| **Детекция аномалий** | `--anomalies [FILE]` | Редкие процессы, нетипичное время логона, необычные parent-child |
+| **Извлечение IOC** | `--ioc-extract [FILE]` | IP-адреса, домены, URL, хэши, email |
 | **Обогащение IOC** | `--vt-key` / `--abuseipdb-key` / `--opentip-key` | VirusTotal, AbuseIPDB, Kaspersky OpenTIP |
-| **Threat scoring** | `--threat-score` | Оценка рисков по хостам/пользователям |
-| **Корреляция атак** | `--correlate` | Группировка детектов в цепочки атак |
+| **Threat scoring** | `--threat-score [FILE]` | Оценка рисков по хостам/пользователям |
+| **Корреляция атак** | `--correlate [FILE]` | Группировка детектов в цепочки атак |
 | **Diff-режим** | `--diff /path/second/` | Сравнение двух наборов данных |
 | **Трансформации** | `--transforms` | Base64-декодирование, LOLBin-детект, DNS-энтропия, обфускация |
 | **Маппинг полей** | `--field-map map.yaml` | Переименование полей во всех событиях |
