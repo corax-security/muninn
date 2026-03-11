@@ -73,6 +73,14 @@ impl Event {
         self.fields.get(key).map(|s| s.as_str())
     }
 
+    pub fn apply_field_map(&mut self, map: &std::collections::HashMap<String, String>) {
+        for (old, new) in map {
+            if let Some(val) = self.fields.remove(old) {
+                self.fields.insert(new.clone(), val);
+            }
+        }
+    }
+
     pub fn compute_hash(&mut self) {
         let hash = xxhash_rust::xxh64::xxh64(self.raw.as_bytes(), 0);
         self.hash = Some(hash);

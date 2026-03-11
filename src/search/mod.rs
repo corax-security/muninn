@@ -352,6 +352,136 @@ impl SearchEngine {
         self.event_count
     }
 
+    pub fn query_sql_with_limit(&self, sql: &str, limit: usize) -> Result<SearchResult> {
+        let trimmed = sql.trim().trim_end_matches(';');
+        let limited = format!("{} LIMIT {}", trimmed, limit);
+        self.query_sql(&limited)
+    }
+
+    pub fn apply_time_filter(
+        &self,
+        time_field: &str,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> Result<usize> {
+        let mut conditions = Vec::new();
+        if let Some(a) = after {
+            conditions.push(format!("\"{}\" < '{}'", time_field, a));
+        }
+        if let Some(b) = before {
+            conditions.push(format!("\"{}\" > '{}'", time_field, b));
+        }
+        if conditions.is_empty() {
+            return Ok(0);
+        }
+        let sql = format!(
+            "DELETE FROM \"{}\" WHERE {}",
+            TABLE,
+            conditions.join(" OR ")
+        );
+        let deleted = self.conn.execute(&sql, [])?;
+        self.conn.execute(
+            &format!(
+                "DELETE FROM \"{}\" WHERE \"{}\" IS NULL OR \"{}\" = ''",
+                TABLE, time_field, time_field
+            ),
+            [],
+        )?;
+        Ok(deleted)
+    }
+
+    pub fn detect_time_field(&self) -> Option<String> {
+        const CANDIDATES: &[&str] = &[
+            "SystemTime",
+            "timestamp",
+            "@timestamp",
+            "TimeCreated",
+            "date",
+            "_time",
+            "time",
+            "datetime",
+            "EventTime",
+            "UtcTime",
+        ];
+        for field in CANDIDATES {
+            if self.columns.iter().any(|c| c == *field) {
+                let sql = format!(
+                    "SELECT COUNT(*) FROM \"{}\" WHERE \"{}\" IS NOT NULL AND \"{}\" != ''",
+                    TABLE, field, field
+                );
+                if let Ok(count) = self
+                    .conn
+                    .query_row(&sql, [], |row| row.get::<_, usize>(0))
+                {
+                    if count > 0 {
+                        return Some(field.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn create_index_on(&self, field: &str) -> Result<()> {
+        let sql = format!(
+            "CREATE INDEX IF NOT EXISTS \"idx_custom_{}\" ON \"{}\" (\"{}\")",
+            field, TABLE, field
+        );
+        self.conn.execute(&sql, [])?;
+        Ok(())
+    }
+
+    pub fn drop_index(&self, index_name: &str) -> Result<()> {
+        let sql = format!("DROP INDEX IF EXISTS \"{}\"", index_name);
+        self.conn.execute(&sql, [])?;
+        Ok(())
+    }
+
+    pub fn list_indexes(&self) -> Result<Vec<String>> {
+        let sql = format!("PRAGMA index_list(\"{}\")", TABLE);
+        let mut stmt = self.conn.prepare(&sql)?;
+        let indexes: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(indexes)
+    }
+
+    pub fn export_jsonl(&self, path: &Path) -> Result<usize> {
+        let sql = format!("SELECT * FROM \"{}\"", TABLE);
+        let mut stmt = self.conn.prepare(&sql)?;
+        let col_names: Vec<String> = stmt.column_names().iter().map(|n| n.to_string()).collect();
+
+        let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
+        let mut count = 0;
+
+        let rows = stmt.query_map([], |row| {
+            let mut map = serde_json::Map::new();
+            for (i, col) in col_names.iter().enumerate() {
+                if col == "_raw" {
+                    continue;
+                }
+                if let Ok(v) = row.get::<_, String>(i) {
+                    if !v.is_empty() {
+                        map.insert(col.clone(), serde_json::Value::String(v));
+                    }
+                }
+            }
+            Ok(map)
+        })?;
+
+        use std::io::Write;
+        for row in rows {
+            if let Ok(map) = row {
+                let json = serde_json::Value::Object(map);
+                writeln!(file, "{}", json)?;
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
     pub fn export_db(&self, path: &Path) -> Result<()> {
         let mut dest = Connection::open(path)?;
         let backup = rusqlite::backup::Backup::new(&self.conn, &mut dest)?;

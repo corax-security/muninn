@@ -1,6 +1,6 @@
 [package]
 name = "muninn"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "Muninn — memory of Corax. High-performance log parsing, SIGMA detection, and search engine. Parses 15+ log formats (EVTX, JSON, Syslog, CEF, LEEF, Zeek, W3C, Auditd, XML, etc.) with built-in SIGMA YAML compiler and SQLite-backed search. One binary, zero dependencies."
 license = "AGPL-3.0-only"
@@ -28,6 +28,10 @@ parser-cef = []
 parser-leef = []
 parser-zeek = []
 parser-w3c = []
+archive = ["dep:flate2", "dep:zip", "dep:bzip2", "dep:tar", "dep:tempfile"]
+ioc-enrich = ["dep:ureq"]
+tui = ["dep:ratatui", "dep:crossterm"]
+live = ["dep:notify"]
 
 [dependencies]
 # Core
@@ -66,6 +70,23 @@ env_logger = { version = "0.11", optional = true }
 
 # Python bindings (optional)
 pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+
+# Archive support (optional)
+flate2 = { version = "1", optional = true }
+zip = { version = "2", optional = true }
+bzip2 = { version = "0.5", optional = true }
+tar = { version = "0.4", optional = true }
+tempfile = { version = "3", optional = true }
+
+# IOC enrichment (optional)
+ureq = { version = "2", optional = true }
+
+# TUI (optional)
+ratatui = { version = "0.28", optional = true }
+crossterm = { version = "0.28", optional = true }
+
+# Live mode (optional)
+notify = { version = "7", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

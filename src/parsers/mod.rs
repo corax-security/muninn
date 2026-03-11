@@ -1,3 +1,6 @@
+#[cfg(feature = "archive")]
+pub mod archive;
+
 mod auditd;
 mod cef;
 mod csv_tsv;
