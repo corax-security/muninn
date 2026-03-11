@@ -1520,7 +1520,7 @@ fn main() -> Result<()> {
             if !cli.quiet {
                 print!("{}", tl_output);
             }
-            std::fs::write(tl_path, &tl_output)?;
+            save_report(tl_path, "Attack Timeline", &tl_output, &entries)?;
             if !cli.quiet {
                 println!("  {} Timeline → {:?}", "✓".green(), tl_path);
             }
@@ -1581,7 +1581,12 @@ fn main() -> Result<()> {
                 })
                 .collect();
             let layer = muninn::mitre::export_navigator_layer(&nav_data, &mapper);
-            std::fs::write(nav_path, serde_json::to_string_pretty(&layer)?)?;
+            save_report(
+                nav_path,
+                "ATT&CK Navigator",
+                &serde_json::to_string_pretty(&layer)?,
+                &layer,
+            )?;
             if !cli.quiet {
                 println!("  {} Navigator layer → {:?}", "✓".green(), nav_path);
             }
