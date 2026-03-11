@@ -1,6 +1,6 @@
 [package]
 name = "muninn"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 description = "Muninn — memory of Corax. High-performance log parsing, SIGMA detection, and search engine. Parses 15+ log formats (EVTX, JSON, Syslog, CEF, LEEF, Zeek, W3C, Auditd, XML, etc.) with built-in SIGMA YAML compiler and SQLite-backed search. One binary, zero dependencies."
 license = "AGPL-3.0-only"
@@ -10,7 +10,6 @@ repository = "https://github.com/corax-security/muninn"
 
 [lib]
 name = "muninn"
-crate-type = ["lib", "cdylib"]
 
 [[bin]]
 name = "muninn"
@@ -96,4 +95,4 @@ tempfile = "3"
 opt-level = 3
 lto = true
 codegen-units = 1
-strip = true
+strip = "debuginfo"

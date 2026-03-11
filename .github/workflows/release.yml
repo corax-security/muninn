@@ -34,10 +34,12 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: muninn-linux-amd64
+            suffix: linux-amd64
+            ext: ""
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            artifact: muninn-windows-amd64.exe
+            suffix: windows-amd64
+            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -50,22 +52,28 @@ jobs:
         shell: bash
         run: echo "RUSTFLAGS=-C target-feature=+crt-static" >> "$GITHUB_ENV"
 
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build release
         run: cargo build --release --features "all-parsers,cli,archive,download,tui,live,ioc-enrich" --target ${{ matrix.target }}
 
-      - name: Rename binary (Linux)
-        if: runner.os == 'Linux'
-        run: cp target/${{ matrix.target }}/release/muninn ${{ matrix.artifact }}
-
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        run: cp target/${{ matrix.target }}/release/muninn.exe ${{ matrix.artifact }}
+      - name: Rename binary
+        shell: bash
+        run: cp "target/${{ matrix.target }}/release/muninn${{ matrix.ext }}" "muninn-${{ steps.version.outputs.tag }}-${{ matrix.suffix }}${{ matrix.ext }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
+          name: muninn-${{ steps.version.outputs.tag }}-${{ matrix.suffix }}${{ matrix.ext }}
+          path: muninn-${{ steps.version.outputs.tag }}-${{ matrix.suffix }}${{ matrix.ext }}
 
   release:
     name: Create Release
@@ -87,5 +95,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/muninn-linux-amd64/muninn-linux-amd64
-            artifacts/muninn-windows-amd64.exe/muninn-windows-amd64.exe
+            artifacts/muninn-${{ github.ref_name }}-linux-amd64/muninn-${{ github.ref_name }}-linux-amd64
+            artifacts/muninn-${{ github.ref_name }}-windows-amd64.exe/muninn-${{ github.ref_name }}-windows-amd64.exe
