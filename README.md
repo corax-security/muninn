@@ -366,7 +366,7 @@ muninn --config muninn.yaml
 | Format | Flag | Description |
 |--------|------|-------------|
 | **JSON report** | *(auto)* | Auto-generated with MITRE mapping, tags, descriptions |
-| **HTML report** | `--gui report.html` | Interactive self-contained HTML with filtering |
+| **HTML report** | `--gui report.html` | Interactive HTML: dashboard, MITRE timeline, ATT&CK matrix, event viewer |
 | **Splunk** | `--template splunk` | NDJSON with `source`, `sourcetype`, `_time` |
 | **ELK** | `--template elk` | NDJSON with `@timestamp`, `_index` |
 | **Timesketch** | `--template timesketch` | JSONL for Timesketch import |
@@ -396,6 +396,25 @@ muninn --config muninn.yaml
 | **Live monitoring** | `--features live` | Watch directory for new events in real-time |
 | **Rule download** | `--features download` | Download SIGMA rules from SigmaHQ releases |
 | **IOC enrichment** | `--features ioc-enrich` | VT/AbuseIPDB/OpenTIP API queries |
+
+### Interactive HTML Report (`--gui`)
+
+Generate a self-contained HTML report with `--gui report.html`:
+
+```bash
+muninn -e evidence/ -r sigma-rules/ --gui report.html
+```
+
+The report includes four interactive views:
+
+| View | Description |
+|------|-------------|
+| **Dashboard** | Summary cards (files, events, detections by severity), severity distribution bar, top-10 detections list |
+| **Timeline** | MITRE ATT&CK swim-lane timeline — tactics as rows, detections on time axis, color-coded by severity. Zoom, pan, click to inspect events |
+| **Detections** | Searchable table with severity/tactic filters, technique badges, click-to-expand event viewer with full field details |
+| **MITRE ATT&CK** | 14-column heatmap matrix — technique cells colored by detection count, hover for rule names |
+
+All data is embedded inline — no server needed, works offline. Dark Norse/Corax theme.
 
 ## Example Output
 
@@ -815,7 +834,7 @@ EXPORT:
       --navigator [FILE]         ATT&CK Navigator layer JSON (auto-named if no path given)
       --template <FORMAT>        Export: splunk, elk, timesketch, csv, sarif
       --template-output [FILE]   Template output path (auto-named if no path given)
-      --gui [FILE]               Self-contained HTML report (auto-named if no path given)
+      --gui [FILE]               Interactive HTML report: dashboard, timeline, MITRE matrix, events
 
 FILTERING:
   -s, --select <GLOB>            Only matching files
@@ -1069,7 +1088,7 @@ muninn --download-rules all --rules-dir ./my-rules/  # своя директор
 | Формат | Флаг | Описание |
 |--------|------|----------|
 | **JSON-отчёт** | *(авто)* | С MITRE-маппингом, тегами, описаниями |
-| **HTML-отчёт** | `--gui report.html` | Интерактивный HTML с фильтрацией |
+| **HTML-отчёт** | `--gui report.html` | Интерактивный HTML: дашборд, MITRE-таймлайн, матрица ATT&CK, просмотр событий |
 | **Splunk** | `--template splunk` | NDJSON с `source`, `sourcetype`, `_time` |
 | **ELK** | `--template elk` | NDJSON с `@timestamp`, `_index` |
 | **Timesketch** | `--template timesketch` | JSONL для импорта в Timesketch |

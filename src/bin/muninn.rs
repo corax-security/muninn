@@ -1496,7 +1496,18 @@ fn main() -> Result<()> {
             if !cli.quiet {
                 print!("{}", kc_output);
             }
-            save_report(kc_path, "Kill Chain View", &kc_output, &kc_data)?;
+            let kc_json: Vec<serde_json::Value> = kc_data
+                .iter()
+                .map(|(title, refs, level, count)| {
+                    serde_json::json!({
+                        "title": title,
+                        "level": level,
+                        "count": count,
+                        "techniques": refs.iter().filter_map(|r| r.technique_id.as_ref()).collect::<Vec<_>>(),
+                    })
+                })
+                .collect();
+            save_report(kc_path, "Kill Chain View", &kc_output, &kc_json)?;
             if !cli.quiet {
                 println!("  {} Kill chain → {:?}", "✓".green(), kc_path);
             }
