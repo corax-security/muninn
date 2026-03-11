@@ -49,14 +49,14 @@ Pre-built binaries: [Releases](https://github.com/corax-security/muninn/releases
 
 **Linux:**
 ```bash
-curl -sL https://github.com/corax-security/muninn/releases/download/v0.4.0/muninn-v0.4.0-linux-amd64 -o muninn
+curl -sL https://github.com/corax-security/muninn/releases/latest/download/muninn-linux-amd64 -o muninn
 chmod +x muninn
 ./muninn -e /path/to/logs/ -r rules/ --stats
 ```
 
 **Windows:**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/corax-security/muninn/releases/download/v0.4.0/muninn-v0.4.0-windows-amd64.exe" -OutFile muninn.exe
+Invoke-WebRequest -Uri "https://github.com/corax-security/muninn/releases/latest/download/muninn-windows-amd64.exe" -OutFile muninn.exe
 .\muninn.exe -e C:\Logs\ -r rules\windows\ --stats
 ```
 
@@ -777,8 +777,8 @@ INPUT / OUTPUT:
   -e, --events <PATH>           Log file or directory (recursive)
   -r, --rules <PATH>            SIGMA rules (file or directory)
   -o, --output <FILE>           JSON output file
-      --dbfile <FILE>            Export SQLite database
-      --keepflat <FILE>          Export flattened events as JSONL
+      --dbfile [FILE]            Export SQLite database (auto-named if no path given)
+      --keepflat [FILE]          Export flattened events as JSONL (auto-named if no path given)
       --no-report                Disable auto-report
   -q, --quiet                   Suppress output
 
@@ -812,10 +812,10 @@ IOC ENRICHMENT (requires --features ioc-enrich):
       --opentip-key <KEY>        Kaspersky OpenTIP API key
 
 EXPORT:
-      --navigator <FILE>         ATT&CK Navigator layer JSON
+      --navigator [FILE]         ATT&CK Navigator layer JSON (auto-named if no path given)
       --template <FORMAT>        Export: splunk, elk, timesketch, csv, sarif
-      --template-output <FILE>   Template output path
-      --gui <FILE>               Self-contained HTML report
+      --template-output [FILE]   Template output path (auto-named if no path given)
+      --gui [FILE]               Self-contained HTML report (auto-named if no path given)
 
 FILTERING:
   -s, --select <GLOB>            Only matching files
@@ -882,7 +882,7 @@ engine.export_db("evidence.db")?;
 ## Building from Source
 
 ```bash
-# Standard build (~6 MB)
+# Standard build
 cargo build --release --features "all-parsers,cli"
 
 # Full build with all optional features
@@ -945,7 +945,7 @@ muninn -e EVTX-ATTACK-SAMPLES/ -r rules/windows/ --timeline --killchain --threat
 |--------|-------|
 | Parsing | ~250K events/sec (parallel, JSON Lines) |
 | SQLite load | 100K events < 5 sec |
-| Binary size | ~6 MB (release, stripped, LTO) |
+| Binary size | Single static binary (release, stripped, LTO) |
 | Memory | SQLite-backed, handles millions of events |
 | Parallelism | File parsing + SIGMA compile via rayon |
 
@@ -984,14 +984,14 @@ Muninn — автономный инструмент для анализа ло�
 
 **Linux:**
 ```bash
-curl -sL https://github.com/corax-security/muninn/releases/download/v0.4.0/muninn-v0.4.0-linux-amd64 -o muninn
+curl -sL https://github.com/corax-security/muninn/releases/latest/download/muninn-linux-amd64 -o muninn
 chmod +x muninn
 ./muninn -e /path/to/logs/ -r rules/ --stats
 ```
 
 **Windows:**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/corax-security/muninn/releases/download/v0.4.0/muninn-v0.4.0-windows-amd64.exe" -OutFile muninn.exe
+Invoke-WebRequest -Uri "https://github.com/corax-security/muninn/releases/latest/download/muninn-windows-amd64.exe" -OutFile muninn.exe
 .\muninn.exe -e C:\Logs\ -r rules\windows\ --stats
 ```
 
@@ -1037,7 +1037,7 @@ muninn --download-rules all --rules-dir ./my-rules/  # своя директор
 | **3100+ SIGMA-правил** | Полный набор [SigmaHQ](https://github.com/SigmaHQ/sigma) — скачать через `--download-rules` |
 | **Компилятор SIGMA** | YAML → SQL с модификаторами: `contains`, `endswith`, `startswith`, `re`, `base64`, `base64offset`, `windash`, `cidr`, `all`, `gt/gte/lt/lte` |
 | **Поисковый движок** | На базе SQLite: ключевые слова, поля, регулярные выражения, SQL |
-| **~6 МБ бинарник** | Статический, без внешних зависимостей |
+| **Один бинарник** | Статический, без внешних зависимостей |
 | **Кроссплатформенный** | Linux x86_64, Windows x86_64 |
 | **Библиотека + CLI** | Rust-крейт, CLI-утилита или Python-модуль |
 
@@ -1076,6 +1076,7 @@ muninn --download-rules all --rules-dir ./my-rules/  # своя директор
 | **CSV** | `--template csv` | Стандартный CSV |
 | **SARIF** | `--template sarif` | Static Analysis Results Interchange Format |
 | **SQLite** | `--dbfile case.db` | Полная БД событий |
+| **JSONL** | `--keepflat events.jsonl` | Экспорт выровненных событий |
 
 #### Производительность
 
@@ -1100,7 +1101,7 @@ muninn --download-rules all --rules-dir ./my-rules/  # своя директор
 ### Сборка из исходников
 
 ```bash
-# Стандартная сборка (~6 МБ)
+# Стандартная сборка
 cargo build --release --features "all-parsers,cli"
 
 # Полная сборка со всеми опциональными фичами
