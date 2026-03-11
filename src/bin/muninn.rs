@@ -525,12 +525,12 @@ fn main() -> Result<()> {
             format!("{b}{b}      {b}{b}   {b}{b}{b}{b}{b}{b}   {b}{b}    {b}{b}{b}  {b}{b}  {b}{b}    {b}{b}{b}  {b}{b}    {b}{b}{b}"),
         ];
         let colors: [(u8, u8, u8); 6] = [
-            (210, 225, 240),  // frost
-            (175, 195, 225),  // pale ice
-            (140, 165, 205),  // silver steel
-            (100, 130, 180),  // cold blue
-            (65, 95, 150),    // deep steel
-            (35, 60, 115),    // night
+            (210, 225, 240), // frost
+            (175, 195, 225), // pale ice
+            (140, 165, 205), // silver steel
+            (100, 130, 180), // cold blue
+            (65, 95, 150),   // deep steel
+            (35, 60, 115),   // night
         ];
         for (line, &(r, g, b)) in banner_lines.iter().zip(colors.iter()) {
             println!("  {}", line.truecolor(r, g, b).bold());
