@@ -72,7 +72,7 @@ struct Cli {
     #[arg(short = 'o', long = "output")]
     output: Option<PathBuf>,
 
-    #[arg(long = "dbfile")]
+    #[arg(long = "dbfile", default_missing_value = "auto", num_args = 0..=1)]
     dbfile: Option<PathBuf>,
 
     #[arg(short = 's', long = "select")]
@@ -131,15 +131,15 @@ struct Cli {
     #[arg(long = "field-map", help = "YAML field rename mapping file")]
     field_map: Option<PathBuf>,
 
-    #[arg(long = "keepflat", help = "Export flattened events as JSONL")]
+    #[arg(long = "keepflat", help = "Export flattened events as JSONL", default_missing_value = "auto", num_args = 0..=1)]
     keepflat: Option<PathBuf>,
 
     // --- Phase 3 features ---
-    #[arg(long = "navigator", help = "Export ATT&CK Navigator layer JSON")]
+    #[arg(long = "navigator", help = "Export ATT&CK Navigator layer JSON", default_missing_value = "auto", num_args = 0..=1)]
     navigator: Option<PathBuf>,
 
-    #[arg(long = "killchain", help = "Show kill chain view of detections")]
-    killchain: bool,
+    #[arg(long = "killchain", help = "Show kill chain view and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    killchain: Option<PathBuf>,
 
     // --- Phase 4 features ---
     #[arg(
@@ -148,10 +148,10 @@ struct Cli {
     )]
     template: Option<String>,
 
-    #[arg(long = "template-output", help = "Template output file path")]
+    #[arg(long = "template-output", help = "Template output file path", default_missing_value = "auto", num_args = 0..=1)]
     template_output: Option<PathBuf>,
 
-    #[arg(long = "gui", help = "Generate self-contained HTML report")]
+    #[arg(long = "gui", help = "Generate self-contained HTML report", default_missing_value = "auto", num_args = 0..=1)]
     gui: Option<PathBuf>,
 
     // --- Phase 5 features ---
@@ -161,14 +161,14 @@ struct Cli {
     )]
     transforms: bool,
 
-    #[arg(long = "timeline", help = "Show attack timeline")]
-    timeline: bool,
+    #[arg(long = "timeline", help = "Show attack timeline and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    timeline: Option<PathBuf>,
 
-    #[arg(long = "anomalies", help = "Detect statistical anomalies")]
-    anomalies: bool,
+    #[arg(long = "anomalies", help = "Detect statistical anomalies and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    anomalies: Option<PathBuf>,
 
-    #[arg(long = "ioc-extract", help = "Extract IOCs from events")]
-    ioc_extract: bool,
+    #[arg(long = "ioc-extract", help = "Extract IOCs from events and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    ioc_extract: Option<PathBuf>,
 
     #[arg(long = "vt-key", help = "VirusTotal API key for IOC enrichment")]
     vt_key: Option<String>,
@@ -182,15 +182,15 @@ struct Cli {
     )]
     opentip_key: Option<String>,
 
-    #[arg(long = "threat-score", help = "Compute per-host/user threat scores")]
-    threat_score: bool,
+    #[arg(long = "threat-score", help = "Compute per-host/user threat scores and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    threat_score: Option<PathBuf>,
 
     // --- Phase 6 features ---
     #[arg(long = "diff", help = "Compare with second evidence set")]
     diff: Option<PathBuf>,
 
-    #[arg(long = "correlate", help = "Correlate events into attack chains")]
-    correlate: bool,
+    #[arg(long = "correlate", help = "Correlate events into attack chains and save to file", default_missing_value = "auto", num_args = 0..=1)]
+    correlate: Option<PathBuf>,
 
     #[arg(
         long = "per-file",
@@ -380,24 +380,124 @@ fn main() -> Result<()> {
         if !cli.transforms {
             cli.transforms = cfg.transforms.unwrap_or(false);
         }
-        if !cli.timeline {
-            cli.timeline = cfg.timeline.unwrap_or(false);
+        if cli.timeline.is_none() && cfg.timeline.unwrap_or(false) {
+            cli.timeline = Some(PathBuf::from("auto"));
         }
-        if !cli.anomalies {
-            cli.anomalies = cfg.anomalies.unwrap_or(false);
+        if cli.anomalies.is_none() && cfg.anomalies.unwrap_or(false) {
+            cli.anomalies = Some(PathBuf::from("auto"));
         }
-        if !cli.ioc_extract {
-            cli.ioc_extract = cfg.ioc_extract.unwrap_or(false);
+        if cli.ioc_extract.is_none() && cfg.ioc_extract.unwrap_or(false) {
+            cli.ioc_extract = Some(PathBuf::from("auto"));
         }
-        if !cli.threat_score {
-            cli.threat_score = cfg.threat_score.unwrap_or(false);
+        if cli.threat_score.is_none() && cfg.threat_score.unwrap_or(false) {
+            cli.threat_score = Some(PathBuf::from("auto"));
         }
-        if !cli.correlate {
-            cli.correlate = cfg.correlate.unwrap_or(false);
+        if cli.correlate.is_none() && cfg.correlate.unwrap_or(false) {
+            cli.correlate = Some(PathBuf::from("auto"));
         }
-        if !cli.killchain {
-            cli.killchain = cfg.killchain.unwrap_or(false);
+        if cli.killchain.is_none() && cfg.killchain.unwrap_or(false) {
+            cli.killchain = Some(PathBuf::from("auto"));
         }
+    }
+
+    // Resolve "auto" paths to timestamped filenames
+    let ts = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    if cli.dbfile.as_ref().is_some_and(|p| p.as_os_str() == "auto") {
+        cli.dbfile = Some(PathBuf::from(format!("muninn_db_{}.db", ts)));
+    }
+    if cli
+        .keepflat
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.keepflat = Some(PathBuf::from(format!("muninn_events_{}.jsonl", ts)));
+    }
+    if cli
+        .navigator
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.navigator = Some(PathBuf::from(format!("muninn_navigator_{}.json", ts)));
+    }
+    if cli.gui.as_ref().is_some_and(|p| p.as_os_str() == "auto") {
+        cli.gui = Some(PathBuf::from(format!("muninn_report_{}.html", ts)));
+    }
+    if cli
+        .timeline
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.timeline = Some(PathBuf::from(format!("muninn_timeline_{}.txt", ts)));
+    }
+    if cli
+        .killchain
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.killchain = Some(PathBuf::from(format!("muninn_killchain_{}.txt", ts)));
+    }
+    if cli
+        .anomalies
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.anomalies = Some(PathBuf::from(format!("muninn_anomalies_{}.txt", ts)));
+    }
+    if cli
+        .ioc_extract
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.ioc_extract = Some(PathBuf::from(format!("muninn_iocs_{}.txt", ts)));
+    }
+    if cli
+        .correlate
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.correlate = Some(PathBuf::from(format!("muninn_correlate_{}.txt", ts)));
+    }
+    if cli
+        .threat_score
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        cli.threat_score = Some(PathBuf::from(format!("muninn_scores_{}.txt", ts)));
+    }
+    if cli
+        .template_output
+        .as_ref()
+        .is_some_and(|p| p.as_os_str() == "auto")
+    {
+        let ext = match cli.template.as_deref() {
+            Some("csv") => "csv",
+            Some("sarif") => "sarif.json",
+            _ => "json",
+        };
+        cli.template_output = Some(PathBuf::from(format!("muninn_export_{}.{}", ts, ext)));
+    }
+
+    /// Save report to file: .html → HTML table, .json → JSON, else plain text.
+    fn save_report(
+        path: &std::path::Path,
+        title: &str,
+        text: &str,
+        data: &impl serde::Serialize,
+    ) -> Result<()> {
+        match path.extension().and_then(|e| e.to_str()) {
+            Some("html") | Some("htm") => {
+                let json = serde_json::to_string(data)?;
+                let html = muninn::output::render_html_table(title, &json);
+                std::fs::write(path, html)?;
+            }
+            Some("json") => {
+                std::fs::write(path, serde_json::to_string_pretty(data)?)?;
+            }
+            _ => {
+                std::fs::write(path, text)?;
+            }
+        }
+        Ok(())
     }
 
     // Load field mapping if provided
@@ -1384,7 +1484,7 @@ fn main() -> Result<()> {
         }
 
         // Kill Chain View
-        if cli.killchain && !cli.quiet {
+        if let Some(ref kc_path) = cli.killchain {
             let kc_data: Vec<_> = results
                 .iter()
                 .map(|d| {
@@ -1393,11 +1493,17 @@ fn main() -> Result<()> {
                 })
                 .collect();
             let kc_output = muninn::mitre::render_killchain(&kc_data, &mapper);
-            print!("{}", kc_output);
+            if !cli.quiet {
+                print!("{}", kc_output);
+            }
+            save_report(kc_path, "Kill Chain View", &kc_output, &kc_data)?;
+            if !cli.quiet {
+                println!("  {} Kill chain → {:?}", "✓".green(), kc_path);
+            }
         }
 
         // Attack Timeline
-        if cli.timeline && !cli.quiet {
+        if let Some(ref tl_path) = cli.timeline {
             let tl_data: Vec<_> = results
                 .iter()
                 .map(|d| {
@@ -1411,11 +1517,17 @@ fn main() -> Result<()> {
                 .collect();
             let entries = muninn::timeline::build_timeline(&tl_data);
             let tl_output = muninn::timeline::render_ascii_timeline(&entries);
-            print!("{}", tl_output);
+            if !cli.quiet {
+                print!("{}", tl_output);
+            }
+            std::fs::write(tl_path, &tl_output)?;
+            if !cli.quiet {
+                println!("  {} Timeline → {:?}", "✓".green(), tl_path);
+            }
         }
 
         // Correlation Engine
-        if cli.correlate && !cli.quiet {
+        if let Some(ref corr_path) = cli.correlate {
             let corr_data: Vec<_> = results
                 .iter()
                 .map(|d| {
@@ -1430,12 +1542,18 @@ fn main() -> Result<()> {
             let chains = muninn::correlate::correlate(&corr_data);
             if !chains.is_empty() {
                 let corr_output = muninn::correlate::render_chains(&chains);
-                print!("{}", corr_output);
+                if !cli.quiet {
+                    print!("{}", corr_output);
+                }
+                save_report(corr_path, "Attack Chains", &corr_output, &chains)?;
+                if !cli.quiet {
+                    println!("  {} Correlations → {:?}", "✓".green(), corr_path);
+                }
             }
         }
 
         // Threat Score
-        if cli.threat_score && !cli.quiet {
+        if let Some(ref score_path) = cli.threat_score {
             let score_data: Vec<_> = results
                 .iter()
                 .map(|d| (d.title.clone(), d.level.clone(), d.result.rows.clone()))
@@ -1443,7 +1561,13 @@ fn main() -> Result<()> {
             let scores = muninn::scoring::compute_scores(&score_data);
             if !scores.is_empty() {
                 let score_output = muninn::scoring::render_scores(&scores);
-                print!("{}", score_output);
+                if !cli.quiet {
+                    print!("{}", score_output);
+                }
+                save_report(score_path, "Threat Scores", &score_output, &scores)?;
+                if !cli.quiet {
+                    println!("  {} Threat scores → {:?}", "✓".green(), score_path);
+                }
             }
         }
 
@@ -1530,19 +1654,23 @@ fn main() -> Result<()> {
     }
 
     // Anomaly Detection (independent of SIGMA results)
-    if cli.anomalies {
+    if let Some(ref anom_path) = cli.anomalies {
         let anomalies = muninn::anomaly::detect_anomalies(&engine)?;
+        let output = muninn::anomaly::render_anomalies(&anomalies);
         if !cli.quiet {
-            let output = muninn::anomaly::render_anomalies(&anomalies);
             print!("{}", output);
+        }
+        save_report(anom_path, "Anomaly Detection", &output, &anomalies)?;
+        if !cli.quiet {
+            println!("  {} Anomalies → {:?}", "✓".green(), anom_path);
         }
     }
 
     // IOC Extraction (independent of SIGMA results)
-    if cli.ioc_extract {
+    if let Some(ref ioc_path) = cli.ioc_extract {
         let iocs = muninn::ioc::extract_iocs(&engine)?;
+        let output = muninn::ioc::render_iocs(&iocs);
         if !cli.quiet {
-            let output = muninn::ioc::render_iocs(&iocs);
             print!("{}", output);
         }
 
@@ -1597,6 +1725,11 @@ fn main() -> Result<()> {
                 let output = muninn::ioc::render_enriched(&all_enriched);
                 print!("{}", output);
             }
+        }
+
+        save_report(ioc_path, "IOC Extraction", &output, &iocs)?;
+        if !cli.quiet {
+            println!("  {} IOCs → {:?}", "✓".green(), ioc_path);
         }
     }
 
